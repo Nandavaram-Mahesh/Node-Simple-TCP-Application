@@ -1,22 +1,43 @@
-const net = require('net')
+const net = require("net");
 
-const port  = 3000
-const host = "127.0.0.1"
-const clients =[]
+const server = net.createServer();
 
-// net.createServer is used to create TCP/IPC server
-const server = net.createServer()
+// an array of client sockets
+const clients = [];
 
+server.on("connection", (socket) => {
+  console.log("A new connection to the server!");
 
-// When client connects to this server connection event is emitted and it is consumed here.
-server.on('connection',(socket)=>{             /* Socket -  it's a Duplex Stream */
-    console.log('New connection established to server')
-    socket.on("data",(data)=>{
-        // console.log(data.toString("utf-8"))
-        clients.map((s)=>s.write(data))
-        clients.push(socket)
-    })
-})
+  const clientId = clients.length + 1;
 
-// server is listening on port:3000 
-server.listen(port,host,()=>{`listening to host:${host} on port:${port}  ${server.address()}`})
+  // Broadcasting a message to everyone when someone enters the chat room
+  clients.map((client) => {
+    client.socket.write(`User ${clientId} joined!`);
+  });
+
+  socket.write(`id-${clientId}`);
+
+  socket.on("data", (data) => {
+    const dataString = data.toString("utf-8");
+    const id = dataString.substring(0, dataString.indexOf("-"));
+    const message = dataString.substring(dataString.indexOf("-message-") + 9);
+
+    clients.map((client) => {
+      client.socket.write(`> User ${id}: ${message}`);
+    });
+  });
+
+  // Broadcasting a message to everyone when someone leaves the chat room
+  socket.on("error", () => {
+    clients.map((client) => {
+        client.socket.write(`User ${clientId} left!`);
+    });
+});
+
+  clients.push({ id: clientId.toString(), socket });
+});
+
+server.listen(3000, "127.0.0.1", () => {
+  console.log("opened server on", server.address());
+});
+
